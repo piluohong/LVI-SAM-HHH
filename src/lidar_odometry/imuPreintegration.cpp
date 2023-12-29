@@ -381,12 +381,13 @@ public:
         odometry.twist.twist.angular.x = thisImu.angular_velocity.x + prevBiasOdom.gyroscope().x();
         odometry.twist.twist.angular.y = thisImu.angular_velocity.y + prevBiasOdom.gyroscope().y();
         odometry.twist.twist.angular.z = thisImu.angular_velocity.z + prevBiasOdom.gyroscope().z();
+
         // information for VINS initialization
         odometry.pose.covariance[0] = double(imuPreintegrationResetId);
-        odometry.pose.covariance[1] = prevBiasOdom.accelerometer().x();
+        odometry.pose.covariance[1] = prevBiasOdom.accelerometer().x();// 线加速度bias
         odometry.pose.covariance[2] = prevBiasOdom.accelerometer().y();
         odometry.pose.covariance[3] = prevBiasOdom.accelerometer().z();
-        odometry.pose.covariance[4] = prevBiasOdom.gyroscope().x();
+        odometry.pose.covariance[4] = prevBiasOdom.gyroscope().x();// 角速度 bias
         odometry.pose.covariance[5] = prevBiasOdom.gyroscope().y();
         odometry.pose.covariance[6] = prevBiasOdom.gyroscope().z();
         odometry.pose.covariance[7] = imuGravity;

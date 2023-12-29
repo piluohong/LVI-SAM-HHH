@@ -82,7 +82,7 @@ public:
     odometryRegister(ros::NodeHandle n_in):
     n(n_in)
     {
-        q_lidar_to_cam = tf::Quaternion(0, 1, 0, 0); // rotate orientation // mark: camera - lidar
+        q_lidar_to_cam = tf::Quaternion(0, 1, 0, 0); // rotate orientation (x,y,z,w) // mark: camera - lidar
         q_lidar_to_cam_eigen = Eigen::Quaterniond(0, 0, 0, 1); // rotate position by pi, (w, x, y, z) // mark: camera - lidar
         // pub_latest_odometry = n.advertise<nav_msgs::Odometry>("odometry/test", 1000);
     }
@@ -95,7 +95,7 @@ public:
 
         nav_msgs::Odometry odomCur;
         
-        // pop old odometry msg
+        // pop old odometry msg 剔除雷达里程计中老旧的信息
         while (!odomQueue.empty()) 
         {
             if (odomQueue.front().header.stamp.toSec() < img_time - 0.05)
@@ -109,7 +109,7 @@ public:
             return odometry_channel;
         }
 
-        // find the odometry time that is the closest to image time
+        // find the odometry time that is the closest to image time 找到相近时间戳的图像数据
         for (int i = 0; i < (int)odomQueue.size(); ++i)
         {
             odomCur = odomQueue[i];
@@ -120,13 +120,14 @@ public:
                 break;
         }
 
-        // time stamp difference still too large
+        // time stamp difference still too large 时间差较大直接返回
         if (abs(odomCur.header.stamp.toSec() - img_time) > 0.05)
         {
             return odometry_channel;
         }
 
         // convert odometry rotation from lidar ROS frame to VINS camera frame (only rotation, assume lidar, camera, and IMU are close enough)
+        // 将里程计旋转信息从雷达系转到vins相机系
         tf::Quaternion q_odom_lidar;
         tf::quaternionMsgToTF(odomCur.pose.pose.orientation, q_odom_lidar);
 
@@ -134,6 +135,7 @@ public:
         tf::quaternionTFToMsg(q_odom_cam, odomCur.pose.pose.orientation);
 
         // convert odometry position from lidar ROS frame to VINS camera frame
+        // 将里程计位置和速度信息 从雷达系转到vins相机系
         Eigen::Vector3d p_eigen(odomCur.pose.pose.position.x, odomCur.pose.pose.position.y, odomCur.pose.pose.position.z);
         Eigen::Vector3d v_eigen(odomCur.twist.twist.linear.x, odomCur.twist.twist.linear.y, odomCur.twist.twist.linear.z);
         Eigen::Vector3d p_eigen_new = q_lidar_to_cam_eigen * p_eigen;

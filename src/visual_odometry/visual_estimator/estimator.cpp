@@ -78,7 +78,7 @@ void Estimator::clearState()
 
     failure_occur = 0;
 }
-
+// 预积分步骤
 void Estimator::processIMU(double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
 {
     if (!first_imu)
@@ -119,25 +119,29 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
                              const vector<float> &lidar_initialization_info,
                              const std_msgs::Header &header)
 {
-    // Add new image features
+    // 1.Add new image features
+    // 1.添加特征点，检查视差 (根据视差决定marge最老帧还是次新帧)
     if (f_manager.addFeatureCheckParallax(frame_count, image, td))
-        marginalization_flag = MARGIN_OLD;
+        marginalization_flag = MARGIN_OLD; // 是关键帧，marge掉最老帧
     else
         marginalization_flag = MARGIN_SECOND_NEW;
 
-    // Marginalize old imgs if lidar odometry available for initialization
+    // 2.Marginalize old imgs if lidar odometry available for initialization
+    // 2.如果雷达里程计初始化可靠，边缘化掉最老帧
     if (solver_flag == INITIAL && lidar_initialization_info[0] >= 0)
         marginalization_flag = MARGIN_OLD;
 
     Headers[frame_count] = header;
 
+    // 3.构造普通帧 (图像数据，时间戳，预积分)
     ImageFrame imageframe(image, lidar_initialization_info, header.stamp.toSec());
-    imageframe.pre_integration = tmp_pre_integration;
+    imageframe.pre_integration = tmp_pre_integration;// 相对于上一帧的预积分
     all_image_frame.insert(make_pair(header.stamp.toSec(), imageframe));
     
     tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
 
-    // Calibrate rotational extrinsics
+    // 4.Calibrate rotational extrinsics
+    // 4.没有手动设置imu-cam外参，将进行在线标定
     if(ESTIMATE_EXTRINSIC == 2)
     {
         ROS_WARN("calibrating extrinsic param, rotation movement is needed");
@@ -158,16 +162,22 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
 
     if (solver_flag == INITIAL)
     {
+        // 5.初始化，滑动窗口满了才能进行初始化 
         if (frame_count == WINDOW_SIZE)
         {
+            
             bool result = false;
+
+            // 外参准确且两次初始化超过0.1s
             if( ESTIMATE_EXTRINSIC != 2 && (header.stamp.toSec() - initial_timestamp) > 0.1)
             {
+                // 进行视觉和imu的初始化
                result = initialStructure();
                initial_timestamp = header.stamp.toSec();
             }
             if(result)
             {
+                // 成功初始化，先进行一次非线性优化，然后滑动窗口
                 solver_flag = NON_LINEAR;
                 solveOdometry();
                 slideWindow();
@@ -178,6 +188,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
                 last_R0 = Rs[0];
                 last_P0 = Ps[0];
             }
+            // 初始化失败直接滑动窗口
             else
                 slideWindow();
         }
